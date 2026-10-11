@@ -5,13 +5,13 @@ game.crowdCountProvider=()=>crowdFlow.counts();
 let policy='standard',commentBucket=-1,lastEvent=-1,saved=false,lastGoalNotice='';
 const yen=n=>'¥'+n.toLocaleString('ja-JP');
 const SOUND_KEY='read-the-crowd-sfx';
+const AUDIO_DEFAULTS_KEY='read-the-crowd-audio-defaults';
 let soundEnabled=true,audioContext=null;
-try{soundEnabled=localStorage.getItem(SOUND_KEY)!=='off';}catch{}
 function updateSoundButton(){const button=$('sound-toggle');if(!button)return;button.textContent=`効果音 ${soundEnabled?'ON':'OFF'}`;button.setAttribute('aria-pressed',String(soundEnabled));button.title=`効果音を${soundEnabled?'オフ':'オン'}にする`;}
 function playSound(cue){if(!soundEnabled)return;const Audio=window.AudioContext||window.webkitAudioContext;if(!Audio)return;try{audioContext??=new Audio();if(audioContext.state==='suspended')audioContext.resume();const notes={select:[[620,.045]],move:[[440,.07],[554,.08]],arrive:[[659,.08],[784,.13]],sell:[[392,.06]],success:[[523,.09],[659,.09],[784,.12]],miss:[[330,.1],[247,.13]],goal:[[523,.09],[659,.09],[784,.09],[1047,.24]],finish:[[659,.1],[784,.1],[1047,.26]]}[cue]||[];let at=audioContext.currentTime;for(const [frequency,duration] of notes){const oscillator=audioContext.createOscillator(),gain=audioContext.createGain();oscillator.type='sine';oscillator.frequency.setValueAtTime(frequency,at);gain.gain.setValueAtTime(.0001,at);gain.gain.exponentialRampToValueAtTime(.12,at+.012);gain.gain.exponentialRampToValueAtTime(.0001,at+duration);oscillator.connect(gain);gain.connect(audioContext.destination);oscillator.start(at);oscillator.stop(at+duration+.015);at+=duration*.82;}}catch{}}
 const BGM_KEY='read-the-crowd-bgm',BGM_TRACK_KEY='read-the-crowd-bgm-track',BGM_TRACKS=['lobby','stroll','neon','stage','closing'];
 let bgmEnabled=true,bgmTrack='lobby';
-try{bgmEnabled=localStorage.getItem(BGM_KEY)!=='off';const savedTrack=localStorage.getItem(BGM_TRACK_KEY);if(BGM_TRACKS.includes(savedTrack))bgmTrack=savedTrack;}catch{}
+try{if(localStorage.getItem(AUDIO_DEFAULTS_KEY)!=='on-by-default-1'){localStorage.setItem(SOUND_KEY,'on');localStorage.setItem(BGM_KEY,'on');localStorage.setItem(AUDIO_DEFAULTS_KEY,'on-by-default-1');}else{soundEnabled=localStorage.getItem(SOUND_KEY)!=='off';bgmEnabled=localStorage.getItem(BGM_KEY)!=='off';}const savedTrack=localStorage.getItem(BGM_TRACK_KEY);if(BGM_TRACKS.includes(savedTrack))bgmTrack=savedTrack;}catch{}
 function updateBgmButtons(){for(const id of ['bgm-toggle','intro-bgm-toggle']){const button=$(id);if(!button)continue;button.textContent=`BGM ${bgmEnabled?'ON':'OFF'}`;button.setAttribute('aria-pressed',String(bgmEnabled));button.title=`BGMを${bgmEnabled?'オフ':'オン'}にする`;}}
 function playBgm(){if(!bgmEnabled)return;const audio=$('bgm-audio'),src=`public/bgm/${bgmTrack}.wav`;if(!audio.src.endsWith(src))audio.src=src;audio.loop=true;audio.volume=.22;audio.play().catch(()=>{});}
 function toggleBgm(){bgmEnabled=!bgmEnabled;try{localStorage.setItem(BGM_KEY,bgmEnabled?'on':'off');}catch{}updateBgmButtons();if(bgmEnabled)playBgm();else{$('bgm-audio').pause();try{$('bgm-audio').currentTime=0;}catch{}}}
