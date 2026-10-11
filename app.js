@@ -32,8 +32,28 @@ function render(){const remaining=Math.max(0,Math.ceil(CONFIG.duration-game.elap
  $('phase').textContent=game.phase().name;$('announcement').textContent=game.event().text;
 }
 function renderGoals(){const goals=game.goals||[];$('goals').innerHTML=goals.map((goal,i)=>{const product=CONFIG.products.find(p=>p.id===goal.productId);const seconds=Math.max(0,Math.ceil(goal.deadline-game.elapsed));const deadline=`${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')}まで`;const progress=goal.status==='complete'?`${goal.quantity}/${goal.quantity}個 · 達成！`:goal.status==='failed'?`${goal.progress}/${goal.quantity}個 · 時間切れ`:`${goal.progress}/${goal.quantity}個 · ${deadline}`;return `<article class="goal-row ${goal.status}"><div class="goal-topline"><b>${String(i+1).padStart(2,'0')}　${goal.title}</b><strong>+${yen(goal.reward)}</strong></div><div class="goal-description">${goal.description}</div><div class="goal-progress-line"><span>${progress}</span><span class="goal-track"><i style="width:${goal.status==='complete'?100:goal.progress/goal.quantity*100}%"></i></span></div></article>`;}).join('');if(game.goalNotice&&game.goalNotice!==lastGoalNotice){lastGoalNotice=game.goalNotice;const notice=$('goal-notice');notice.textContent=game.goalNotice;notice.classList.add('visible');const message=game.goalNotice;setTimeout(()=>{if(notice.textContent===message)notice.classList.remove('visible');},4200);}}
-let playerMotionTimers=[];
-function setPlayer(target,seconds=0){playerMotionTimers.forEach(clearTimeout);playerMotionTimers=[];const destination=crowdFlow.placePoint(target),snapTo=end=>{$('player').style.transitionDuration=end+'s';$('player').style.left=destination.x+'%';$('player').style.top=(destination.y-7)+'%';};if(!seconds||!game.running){snapTo('0s');return;}const source=crowdFlow.placePoint(game.location),hops=crowdFlow.routeBetween(game.location,target),points=hops.map(hop=>({x:hop.x,y:hop.y-7}));points.push({x:destination.x,y:destination.y-7});let previous={x:source.x,y:source.y-7};const distances=points.map(point=>{const distance=Math.hypot((point.x-previous.x)*10,(point.y-previous.y)*(20/3));previous=point;return distance;});const total=distances.reduce((sum,distance)=>sum+distance,0);let delay=0;for(let i=0;i<points.length;i++){const duration=total?seconds*distances[i]/total:seconds;const point=points[i];playerMotionTimers.push(setTimeout(()=>{$('player').style.transitionDuration=`${Math.max(.05,duration)}s`;$('player').style.left=point.x+'%';$('player').style.top=point.y+'%';},delay*1000));delay+=duration;}}
+let playerMotionFrame=0;
+function setPlayer(target,seconds=0){
+ if(playerMotionFrame)cancelAnimationFrame(playerMotionFrame);
+ const player=$('player'),destination=crowdFlow.placePoint(target),place=(point)=>{player.style.left=point.x+'%';player.style.top=(point.y-7)+'%';};
+ player.style.transition='none';
+ if(!seconds||!game.running){place(destination);return;}
+ const source=crowdFlow.placePoint(game.location),hops=crowdFlow.routeBetween(game.location,target),points=[source,...hops,destination].map(point=>({x:point.x,y:point.y-7}));
+ const map=$('.map-wrap'),rect=map.getBoundingClientRect();
+ const lengths=[];let total=0;
+ for(let i=1;i<points.length;i++){const length=Math.hypot((points[i].x-points[i-1].x)*rect.width/100,(points[i].y-points[i-1].y)*rect.height/100);lengths.push(length);total+=length;}
+ if(!total){place(destination);return;}
+ const started=performance.now(),duration=seconds*1000;
+ const animate=(now)=>{
+  const progress=Math.min(1,(now-started)/duration),distance=progress*total;
+  let segment=0,remaining=distance;
+  while(segment<lengths.length-1&&remaining>lengths[segment]){remaining-=lengths[segment++];}
+  const fraction=lengths[segment]?Math.min(1,remaining/lengths[segment]):1,a=points[segment],b=points[segment+1];
+  place({x:a.x+(b.x-a.x)*fraction,y:a.y+(b.y-a.y)*fraction});
+  if(progress<1)playerMotionFrame=requestAnimationFrame(animate);else{playerMotionFrame=0;place(destination);}
+ };
+ playerMotionFrame=requestAnimationFrame(animate);
+}
 function saleResult(){const r=game.lastResult;if(!r)return;const p=CONFIG.products[r.index];$('sale-result').innerHTML=`<b>${p.name} ${r.quantity}個出して、${r.sold}個売れました。</b><br>単価 ${yen(r.price)} · 売上 ${yen(r.revenue)} · 利益 ${yen(r.profit)} · 残り ${r.remaining}個${r.sold===0?'<p>今は欲しい人が少ないようです。価格を下げるか、別の場所・商品を試そう。</p>':''}`;}
 function start(){game.start(performance.now());crowdFlow.reset();policy='standard';commentBucket=-1;lastEvent=-1;lastGoalNotice='';saved=false;$('product').value='0';$('sale-result').textContent='まずは声を聞いて、最初の商品を選ぼう。';setPlayer('lobby');$('welcome').close();$('results').close();renderQuantity();showComments();window.scrollTo({top:0,behavior:'instant'});}
 function finish(){if(saved)return;saved=true;$('help').close();saleResult();const summary=game.summary();$('final-profit').textContent=yen(summary.profit);const achieved=game.goals.filter(g=>g.status==='complete').length;$('evaluation').textContent=achieved===2?'2つの目標を達成！読みと判断が光った！':achieved===1?'目標達成ボーナスを獲得！別ルートも試してみよう。':summary.sold>=30?'来場者の流れを読むのが上手い！':game.productSales[3]>=2?'高単価商品の売り方が光った！':summary.sold>=12?'いい読み！次はイベントの変化も追いかけよう。':'次はコメントをヒントに、売り場や価格を変えてみよう。';$('result-stats').innerHTML=[['総売上',yen(summary.revenue)],['目標報酬',yen(summary.goalBonus)],['販売個数',summary.sold+'個'],['売れ残り',summary.remaining+'個'],['最も稼げた場所',summary.place],['最も売れた商品',summary.product]].map(([label,value])=>`<div><span>${label}</span><b>${value}</b></div>`).join('');const record={profit:summary.profit,sold:summary.sold,date:new Date().toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})};const records=[...readRanking(),record].sort((a,b)=>b.profit-a.profit).slice(0,5);try{localStorage.setItem(CONFIG.rankingKey,JSON.stringify(records));$('save-status').textContent=records.includes(record)?'今回の記録がTOP 5に入りました。保存済みです。':'プレイ終了。次はTOP 5を目指そう！';}catch{$('save-status').textContent='ブラウザの保存が制限されています。今回の記録は再読み込みすると消えます。';}$('ranking').innerHTML=rankingHTML(records);$('next-action').textContent='終了！結果を確認しよう';$('results').showModal();}
