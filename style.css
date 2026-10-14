@@ -24,3 +24,5 @@
 .intro{max-height:92dvh;overflow-y:auto}
 @media(max-width:480px){.header{flex-wrap:wrap}.header .brand{flex:0 0 100%}.header .audio-toggle,.header #help-button{flex:1;text-align:center;margin:0}.music-settings{grid-template-columns:1fr auto}.music-settings label{grid-column:1/-1}.music-settings select{min-width:0}.music-settings .quiet{grid-column:1/-1}}
 .arcade-reward{border:1px solid #c5d8c6;background:#edf4e8;border-radius:12px;padding:18px;margin:20px 0;text-align:center}.arcade-reward h2{margin:6px 0;font-size:22px}.arcade-reward p{margin:8px 0;font-size:13px}.arcade-coins{display:block;color:var(--green);font-size:34px;margin:10px}.arcade-qr{display:block;width:min(240px,100%);height:auto;margin:14px auto;background:white;padding:8px;border-radius:8px}.arcade-expiry{color:var(--muted);font-size:11px!important}.arcade-retry{border-color:var(--green);color:var(--green);font-weight:700}
+
+.arcade-qr[hidden]{display:none}
