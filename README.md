@@ -44,7 +44,7 @@ ZERO_ARCADE_API_KEY=<このゲーム用の秘密キー>
 
 このリポジトリにはVercel用の`vercel.json`と、同一オリジンで動く`api/session/start.js`・`api/reward.js`を追加しています。ゲーム画面は静的ファイルとして配信し、報酬処理はVercelのNode.js Functionsで動きます。ローカルでは`server.mjs`が同じAPIを提供します。`.openai/hosting.json`は別サービス用の静的配信設定で、Vercelの設定ではありません。
 
-初回公開は、Vercel Dashboardで**Add New… → Project → Import Git Repository**から`tanadesu/hanbai`を選びます。Root Directoryはリポジトリ直下、Framework Presetは**Other**にします。Build CommandとOutput Directoryは上書きせず、Deployします。すでにこのリポジトリを接続したVercelプロジェクトがあれば、新しいプロジェクトを作らず、そのプロジェクトへデプロイしてください。GitHubの`main`への反映後は、Vercelが自動デプロイする設定が一般的です。
+Vercelでは`vercel.json`がFramework Presetを**Other**、Output Directoryをリポジトリ直下（`.`）に固定します。`public/`には画像・BGMがあり`index.html`はルートにあるため、`public/`だけを出力先にするとゲーム画面が配信されません。`api/`内の2ルートはVercel Functionsとして動きます。初回公開はVercel Dashboardで**Add New… → Project → Import Git Repository**から`tanadesu/hanbai`を選び、Root Directoryをリポジトリ直下、Build Commandを空欄にし、Output Directoryを上書きしない状態でDeployします。すでにこのリポジトリを接続したVercelプロジェクトがあれば、そのプロジェクトを使ってください。GitHubの`main`への反映後は、Vercelが自動デプロイします。
 
 公開前に、対象Projectの**Settings → Environment Variables → Add New**で2つの環境変数を登録します。**Production**を選び、必要ならPreviewにも別途設定します。
 
