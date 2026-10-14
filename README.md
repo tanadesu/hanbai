@@ -53,6 +53,12 @@ Vercelでは`vercel.json`がFramework Presetを**Other**、Output Directoryを�
 
 値を設定したら保存し、**Deployments → 最新デプロイ → Redeploy**、またはGitHubの最新コミットをデプロイします。VercelはProject Settingsから環境変数を設定し、追加・変更後に再デプロイすると新しい値が有効になります。画面名は[Vercel公式の環境変数ガイド](https://vercel.com/docs/projects/environment-variables)で確認できます。
 
+### Vercelログで停止箇所を確認
+
+Vercelの対象プロジェクトで**Logs**を開き、**Request Path**を`/api/session/start`または`/api/reward`に絞ります。セッション開始時は`session_start_ok`、設定漏れなら`session_start_failed`と`missing_api_key`が記録されます。報酬処理では`reward_upstream_request`の後に、成功なら`reward_success`、運営APIのHTTPエラーなら`reward_upstream_http_error`（応答status付き）、接続失敗なら`reward_upstream_exception`が出ます。`play_not_finished`や`invalid_session`など、ゲーム側検証で止まった場合も理由名が出ます。
+
+ログにはAPIキー、送信先URL、セッションID、プレイID、利益、QR画像データを記録しません。運営APIの応答本文も記録しません。
+
 APIキーをブラウザ用JavaScript、HTML、GitHub、URL、公開環境変数へ入れないでください。キーの値をチャットやログに貼る必要はありません。キーが未設定でもゲーム結果は出ますが、ユニコイン連携は利用できません。
 
 利益計算自体は現在もブラウザ内です。署名付きのプレイ開始IDとプレイ時間をサーバーで検証し、再試行には同じ`playId`を使います。スコアはブラウザから届くため、中継だけでは偽の高得点を完全には防げません。報酬APIが同じ`playId`への重複発行を防ぎますが、公開Webで運用する場合は販売計算をサーバー側に移すかスタッフ確認を組み合わせてください。

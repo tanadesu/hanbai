@@ -23,7 +23,10 @@ test('Vercel routes keep secrets server-side and reuse a stable playId for retri
   const oldUrl = process.env.ZERO_ARCADE_API_URL;
   const oldKey = process.env.ZERO_ARCADE_API_KEY;
   const oldFetch = global.fetch;
+  const oldConsole = { info: console.info, warn: console.warn, error: console.error };
   const calls = [];
+  const logs = [];
+  for (const level of Object.keys(oldConsole)) console[level] = (...args) => logs.push(args.join(' '));
   process.env.ZERO_ARCADE_API_URL = 'https://admin.example.test/api/arcade/rewards';
   process.env.ZERO_ARCADE_API_KEY = 'unit-test-only-secret';
   global.fetch = async (url, options) => {
@@ -49,9 +52,34 @@ test('Vercel routes keep secrets server-side and reuse a stable playId for retri
     assert.equal(calls[0].headers.Authorization, `Bearer ${process.env.ZERO_ARCADE_API_KEY}`);
     assert.equal(calls[0].url, 'https://admin.example.test/api/arcade/rewards');
     assert.equal(readSession(sessionId, process.env.ZERO_ARCADE_API_KEY) !== null, true);
+    const output = logs.join('\n');
+    assert.match(output, /session_start_ok/);
+    assert.match(output, /reward_upstream_request/);
+    assert.match(output, /reward_success/);
+    for (const sensitive of [process.env.ZERO_ARCADE_API_KEY, process.env.ZERO_ARCADE_API_URL, '2400', 'data:image/png;base64,YQ==']) {
+      assert.equal(output.includes(sensitive), false);
+    }
   } finally {
     global.fetch = oldFetch;
+    for (const level of Object.keys(oldConsole)) console[level] = oldConsole[level];
     if (oldUrl === undefined) delete process.env.ZERO_ARCADE_API_URL; else process.env.ZERO_ARCADE_API_URL = oldUrl;
+    if (oldKey === undefined) delete process.env.ZERO_ARCADE_API_KEY; else process.env.ZERO_ARCADE_API_KEY = oldKey;
+  }
+});
+
+test('Vercel logs a safe reason when the session signing key is missing', async () => {
+  const oldKey = process.env.ZERO_ARCADE_API_KEY;
+  const oldError = console.error;
+  const logs = [];
+  delete process.env.ZERO_ARCADE_API_KEY;
+  console.error = (...args) => logs.push(args.join(' '));
+  try {
+    const res = response();
+    await start({ method: 'POST' }, res);
+    assert.equal(res.statusCode, 503);
+    assert.match(logs.join('\n'), /missing_api_key/);
+  } finally {
+    console.error = oldError;
     if (oldKey === undefined) delete process.env.ZERO_ARCADE_API_KEY; else process.env.ZERO_ARCADE_API_KEY = oldKey;
   }
 });
