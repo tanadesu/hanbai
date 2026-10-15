@@ -44,26 +44,30 @@ function render(){const remaining=Math.max(0,Math.ceil(CONFIG.duration-game.elap
  $('phase').textContent=game.phase().name;$('announcement').textContent=game.event().text;
 }
 function renderGoals(){const goals=game.goals||[];$('goals').innerHTML=goals.map((goal,i)=>{const product=CONFIG.products.find(p=>p.id===goal.productId);const seconds=Math.max(0,Math.ceil(goal.deadline-game.elapsed));const deadline=`${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')}まで`;const progress=goal.status==='complete'?`${goal.quantity}/${goal.quantity}個 · 達成！`:goal.status==='failed'?`${goal.progress}/${goal.quantity}個 · 時間切れ`:`${goal.progress}/${goal.quantity}個 · ${deadline}`;return `<article class="goal-row ${goal.status}"><div class="goal-topline"><b>${String(i+1).padStart(2,'0')}　${goal.title}</b><strong>+${yen(goal.reward)}</strong></div><div class="goal-description">${goal.description}</div><div class="goal-progress-line"><span>${progress}</span><span class="goal-track"><i style="width:${goal.status==='complete'?100:goal.progress/goal.quantity*100}%"></i></span></div></article>`;}).join('');if(game.goalNotice&&game.goalNotice!==lastGoalNotice){lastGoalNotice=game.goalNotice;if(game.goalNotice.includes('達成'))playSound('goal');const notice=$('goal-notice');notice.textContent=game.goalNotice;notice.classList.add('visible');const message=game.goalNotice;setTimeout(()=>{if(notice.textContent===message)notice.classList.remove('visible');},4200);}}
-let playerMotionFrame=0;
+let playerMotionFrame=0,playerAnimation=null;
 function setPlayer(target,seconds=0){
- if(playerMotionFrame)cancelAnimationFrame(playerMotionFrame);
- const player=$('player'),destination=crowdFlow.placePoint(target),place=(point)=>{player.style.left=point.x+'%';player.style.top=(point.y-7)+'%';};
- player.style.transition='none';
+ if(playerMotionFrame){cancelAnimationFrame(playerMotionFrame);playerMotionFrame=0;}
+ if(playerAnimation){playerAnimation.cancel();playerAnimation=null;}
+ const player=$('player'),destination=crowdFlow.placePoint(target),place=point=>{player.style.left=point.x+'%';player.style.top=(point.y-7)+'%';};
  if(!seconds||!game.running){place(destination);return;}
  const source=crowdFlow.placePoint(game.location),hops=crowdFlow.routeBetween(game.location,target),points=[source,...hops,destination].map(point=>({x:point.x,y:point.y-7}));
- const map=$('.map-wrap'),rect=map.getBoundingClientRect();
- const lengths=[];let total=0;
+ const map=$('.map-wrap'),rect=map.getBoundingClientRect(),lengths=[];let total=0;
  for(let i=1;i<points.length;i++){const length=Math.hypot((points[i].x-points[i-1].x)*rect.width/100,(points[i].y-points[i-1].y)*rect.height/100);lengths.push(length);total+=length;}
  if(!total){place(destination);return;}
+ if(player.animate){
+  const frames=[];let distance=0;
+  for(let i=0;i<points.length;i++){
+   if(i>0)distance+=lengths[i-1];
+   if(i&&distance===distance-lengths[i-1])continue;
+   frames.push({left:points[i].x+'%',top:points[i].y+'%',offset:distance/total});
+  }
+  frames[0].offset=0;frames[frames.length-1].offset=1;place(source);
+  playerAnimation=player.animate(frames,{duration:seconds*1000,easing:'linear',fill:'forwards'});
+  playerAnimation.onfinish=()=>{place(destination);playerAnimation.cancel();playerAnimation=null;};
+  return;
+ }
  const started=performance.now(),duration=seconds*1000;
- const animate=(now)=>{
-  const progress=Math.min(1,(now-started)/duration),distance=progress*total;
-  let segment=0,remaining=distance;
-  while(segment<lengths.length-1&&remaining>lengths[segment]){remaining-=lengths[segment++];}
-  const fraction=lengths[segment]?Math.min(1,remaining/lengths[segment]):1,a=points[segment],b=points[segment+1];
-  place({x:a.x+(b.x-a.x)*fraction,y:a.y+(b.y-a.y)*fraction});
-  if(progress<1)playerMotionFrame=requestAnimationFrame(animate);else{playerMotionFrame=0;place(destination);}
- };
+ const animate=now=>{const progress=Math.min(1,(now-started)/duration),distance=progress*total;let segment=0,remaining=distance;while(segment<lengths.length-1&&remaining>lengths[segment])remaining-=lengths[segment++];const fraction=lengths[segment]?Math.min(1,remaining/lengths[segment]):1,a=points[segment],b=points[segment+1];place({x:a.x+(b.x-a.x)*fraction,y:a.y+(b.y-a.y)*fraction});if(progress<1)playerMotionFrame=requestAnimationFrame(animate);else{playerMotionFrame=0;place(destination);}};
  playerMotionFrame=requestAnimationFrame(animate);
 }
 $('bgm-track').value=bgmTrack;$('bgm-track').onchange=()=>{bgmTrack=BGM_TRACKS.includes($('bgm-track').value)?$('bgm-track').value:'lobby';try{localStorage.setItem(BGM_TRACK_KEY,bgmTrack);}catch{}if(bgmEnabled)playBgm();};$('bgm-toggle').onclick=toggleBgm;$('intro-bgm-toggle').onclick=toggleBgm;updateBgmButtons();
