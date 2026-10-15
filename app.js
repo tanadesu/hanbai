@@ -44,28 +44,16 @@ function render(){const remaining=Math.max(0,Math.ceil(CONFIG.duration-game.elap
  $('phase').textContent=game.phase().name;$('announcement').textContent=game.event().text;
 }
 function renderGoals(){const goals=game.goals||[];$('goals').innerHTML=goals.map((goal,i)=>{const product=CONFIG.products.find(p=>p.id===goal.productId);const seconds=Math.max(0,Math.ceil(goal.deadline-game.elapsed));const deadline=`${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')}まで`;const progress=goal.status==='complete'?`${goal.quantity}/${goal.quantity}個 · 達成！`:goal.status==='failed'?`${goal.progress}/${goal.quantity}個 · 時間切れ`:`${goal.progress}/${goal.quantity}個 · ${deadline}`;return `<article class="goal-row ${goal.status}"><div class="goal-topline"><b>${String(i+1).padStart(2,'0')}　${goal.title}</b><strong>+${yen(goal.reward)}</strong></div><div class="goal-description">${goal.description}</div><div class="goal-progress-line"><span>${progress}</span><span class="goal-track"><i style="width:${goal.status==='complete'?100:goal.progress/goal.quantity*100}%"></i></span></div></article>`;}).join('');if(game.goalNotice&&game.goalNotice!==lastGoalNotice){lastGoalNotice=game.goalNotice;if(game.goalNotice.includes('達成'))playSound('goal');const notice=$('goal-notice');notice.textContent=game.goalNotice;notice.classList.add('visible');const message=game.goalNotice;setTimeout(()=>{if(notice.textContent===message)notice.classList.remove('visible');},4200);}}
-let playerMotionFrame=0,playerAnimation=null;
+let playerMotionFrame=0;
 function setPlayer(target,seconds=0){
  if(playerMotionFrame){cancelAnimationFrame(playerMotionFrame);playerMotionFrame=0;}
- if(playerAnimation){playerAnimation.cancel();playerAnimation=null;}
  const player=$('player'),destination=crowdFlow.placePoint(target),place=point=>{player.style.left=point.x+'%';player.style.top=(point.y-7)+'%';};
+ player.style.transition='none';
  if(!seconds||!game.running){place(destination);return;}
  const source=crowdFlow.placePoint(game.location),hops=crowdFlow.routeBetween(game.location,target),points=[source,...hops,destination].map(point=>({x:point.x,y:point.y-7}));
  const map=$('.map-wrap'),rect=map.getBoundingClientRect(),lengths=[];let total=0;
  for(let i=1;i<points.length;i++){const length=Math.hypot((points[i].x-points[i-1].x)*rect.width/100,(points[i].y-points[i-1].y)*rect.height/100);lengths.push(length);total+=length;}
  if(!total){place(destination);return;}
- if(player.animate){
-  const frames=[];let distance=0;
-  for(let i=0;i<points.length;i++){
-   if(i>0)distance+=lengths[i-1];
-   if(i&&distance===distance-lengths[i-1])continue;
-   frames.push({left:points[i].x+'%',top:points[i].y+'%',offset:distance/total});
-  }
-  frames[0].offset=0;frames[frames.length-1].offset=1;place(source);
-  playerAnimation=player.animate(frames,{duration:seconds*1000,easing:'linear',fill:'forwards'});
-  playerAnimation.onfinish=()=>{place(destination);playerAnimation.cancel();playerAnimation=null;};
-  return;
- }
  const started=performance.now(),duration=seconds*1000;
  const animate=now=>{const progress=Math.min(1,(now-started)/duration),distance=progress*total;let segment=0,remaining=distance;while(segment<lengths.length-1&&remaining>lengths[segment])remaining-=lengths[segment++];const fraction=lengths[segment]?Math.min(1,remaining/lengths[segment]):1,a=points[segment],b=points[segment+1];place({x:a.x+(b.x-a.x)*fraction,y:a.y+(b.y-a.y)*fraction});if(progress<1)playerMotionFrame=requestAnimationFrame(animate);else{playerMotionFrame=0;place(destination);}};
  playerMotionFrame=requestAnimationFrame(animate);
@@ -80,7 +68,7 @@ function displayReward(data){rewardReceipt=data;$('arcade-reward-status').textCo
 async function requestArcadeReward(summary){renderRewardPending();rewardPoints=Math.max(0,Math.floor(summary.profit));const sessionId=arcadeSessionId||await arcadeSessionReady;if(!sessionId){showRewardError('報酬連携を開始できませんでした。ゲーム結果は表示されています。');return;}arcadeSessionId=sessionId;await retryArcadeReward();}
 async function retryArcadeReward(){if(rewardBusy||!arcadeSessionId||rewardPoints===null||rewardReceipt)return;rewardBusy=true;$('arcade-retry').hidden=true;$('arcade-reward-status').textContent='ユニコインQRを確認しています…';try{const response=await fetch('/api/reward',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:arcadeSessionId,points:rewardPoints})});const data=await response.json();if(!response.ok)throw new Error(data.message||'QRを発行できませんでした。');displayReward(data);}catch(error){showRewardError(`${error.message} ゲーム結果は表示されています。`);}finally{rewardBusy=false;if(!rewardReceipt)$('arcade-retry').hidden=!arcadeSessionId;}}
 function finish(){if(saved)return;saved=true;playSound('finish');$('help').close();saleResult(false);const summary=game.summary();$('final-profit').textContent=yen(summary.profit);const achieved=game.goals.filter(g=>g.status==='complete').length;$('evaluation').textContent=achieved===2?'2つの目標を達成！読みと判断が光った！':achieved===1?'目標達成ボーナスを獲得！別ルートも試してみよう。':summary.sold>=30?'来場者の流れを読むのが上手い！':game.productSales[3]>=2?'高単価商品の売り方が光った！':summary.sold>=12?'いい読み！次はイベントの変化も追いかけよう。':'次はコメントをヒントに、売り場や価格を変えてみよう。';$('result-stats').innerHTML=[['総売上',yen(summary.revenue)],['目標報酬',yen(summary.goalBonus)],['販売個数',summary.sold+'個'],['売れ残り',summary.remaining+'個'],['最も稼げた場所',summary.place],['最も売れた商品',summary.product]].map(([label,value])=>`<div><span>${label}</span><b>${value}</b></div>`).join('');const record={profit:summary.profit,sold:summary.sold,date:new Date().toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})};const records=[...readRanking(),record].sort((a,b)=>b.profit-a.profit).slice(0,5);try{localStorage.setItem(CONFIG.rankingKey,JSON.stringify(records));$('save-status').textContent=records.includes(record)?'今回の記録がTOP 5に入りました。保存済みです。':'プレイ終了。次はTOP 5を目指そう！';}catch{$('save-status').textContent='ブラウザの保存が制限されています。今回の記録は再読み込みすると消えます。';}$('ranking').innerHTML=rankingHTML(records);$('next-action').textContent='終了！結果を確認しよう';$('results').showModal();void requestArcadeReward(summary);}
-function tick(){const event=game.tick(performance.now());if(event==='moved'){playSound('arrive');showComments();}if(event==='sold'){saleResult();renderQuantity();}if(game.running){const bucket=Math.floor(game.elapsed/CONFIG.commentSeconds);if(bucket!==commentBucket||lastEvent!==game.event().at){commentBucket=bucket;lastEvent=game.event().at;if(!game.busy)showComments();}render();}if(event==='finished'){render();finish();}}
+function tick(){const event=game.tick(performance.now());if(event==='moved'){if(!playerMotionFrame)setPlayer(game.location);playSound('arrive');showComments();}if(event==='sold'){saleResult();renderQuantity();}if(game.running){const bucket=Math.floor(game.elapsed/CONFIG.commentSeconds);if(bucket!==commentBucket||lastEvent!==game.event().at){commentBucket=bucket;lastEvent=game.event().at;if(!game.busy)showComments();}render();}if(event==='finished'){if(game.location)setPlayer(game.location);render();finish();}}
 $('hotspots').addEventListener('click',e=>{const b=e.target.closest('[data-place]');if(!b||game.busy||!game.running)return;playSound('select');game.selected=b.dataset.place;showComments();render();});
 $('move-button').onclick=()=>{tick();const seconds=game.travelSeconds(game.selected);if(game.move(game.selected,performance.now())){playSound('move');setPlayer(game.selected,seconds);$('comments').innerHTML='<div class="voice-placeholder">売り場へ移動中…<br>到着すると来場者の声が聞こえます。</div>';render();}};
 $('map-move-button').onclick=()=>$('move-button').click();
