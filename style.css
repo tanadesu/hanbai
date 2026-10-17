@@ -26,3 +26,4 @@
 .arcade-reward{border:1px solid #c5d8c6;background:#edf4e8;border-radius:12px;padding:18px;margin:20px 0;text-align:center}.arcade-reward h2{margin:6px 0;font-size:22px}.arcade-reward p{margin:8px 0;font-size:13px}.arcade-coins{display:block;color:var(--green);font-size:34px;margin:10px}.arcade-qr{display:block;width:min(240px,100%);height:auto;margin:14px auto;background:white;padding:8px;border-radius:8px}.arcade-expiry{color:var(--muted);font-size:11px!important}.arcade-retry{border-color:var(--green);color:var(--green);font-weight:700}
 
 .arcade-qr[hidden]{display:none}
+.timer-heading{display:flex;align-items:center;justify-content:space-between;gap:8px}.pause-button{border:1px solid #ffffff70;background:#ffffff18;color:#fff;border-radius:6px;padding:7px 11px;font-size:12px;font-weight:700;min-height:36px}.pause-button:hover{background:#ffffff30}.timer-card.is-paused{background:#394940}.timer-card.is-paused #next-action{color:#e8d19f;font-weight:700}
